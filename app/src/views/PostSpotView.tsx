@@ -178,52 +178,55 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
               Tags <span className="font-jp text-xs ml-1" style={{ color: '#8a7a6d' }}>タグ（最大{MAX_TAGS}つ）</span>
             </label>
 
-            {/* Tag chips + input */}
-            <div
-              className="flex flex-wrap gap-1.5 border px-2 py-2 bg-white cursor-text"
-              style={{ borderColor: '#E8E0D2', minHeight: 44 }}
-              onClick={() => tagInputRef.current?.focus()}
-            >
-              {tags.map(t => (
-                <span
-                  key={t}
-                  className="flex items-center gap-1 px-2 py-0.5 text-xs font-serif"
-                  style={{ backgroundColor: 'rgba(196,97,47,0.10)', color: '#C4612F', border: '1px solid rgba(196,97,47,0.3)' }}
-                >
-                  #{t}
-                  <button type="button" onClick={() => removeTag(t)} className="text-xs leading-none" style={{ color: '#C4612F' }}>×</button>
-                </span>
-              ))}
-              {canAddTag && (
-                <input
-                  ref={tagInputRef}
-                  type="text"
-                  value={tagInput}
-                  onChange={e => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  onBlur={() => { if (tagInput) { commitTag(tagInput); setTagInput('') } }}
-                  placeholder={tags.length === 0 ? 'shrine, cat, moss…' : ''}
-                  className="flex-1 min-w-[80px] font-serif text-sm outline-none bg-transparent"
-                  style={{ color: '#2B2623' }}
-                />
-              )}
-            </div>
+            {/* Added tag chips */}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {tags.map(t => (
+                  <span
+                    key={t}
+                    className="flex items-center gap-1 px-2 py-0.5 text-xs font-serif"
+                    style={{ backgroundColor: 'rgba(196,97,47,0.10)', color: '#C4612F', border: '1px solid rgba(196,97,47,0.3)' }}
+                  >
+                    #{t}
+                    <button type="button" onClick={() => removeTag(t)} className="text-xs leading-none" style={{ color: '#C4612F' }}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
 
-            {/* Suggestions */}
+            {/* Custom text input — clearly visible */}
+            {canAddTag && (
+              <input
+                ref={tagInputRef}
+                type="text"
+                value={tagInput}
+                onChange={e => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                onBlur={() => { if (tagInput) { commitTag(tagInput); setTagInput('') } }}
+                placeholder="Type a tag + Enter  (例: narrow, retro, hidden…)"
+                className="w-full border px-3 py-2 bg-white font-serif text-sm"
+                style={{ borderColor: '#E8E0D2', color: '#2B2623' }}
+              />
+            )}
+            {!canAddTag && (
+              <p className="text-xs font-serif italic" style={{ color: '#8a7a6d' }}>Max {MAX_TAGS} tags reached</p>
+            )}
+
+            {/* Quick-pick suggestions */}
             <div className="flex flex-wrap gap-1.5 mt-2">
               {TAG_SUGGESTIONS.filter(t => !tags.includes(t)).slice(0, 8).map(t => (
                 <button
                   key={t} type="button"
                   onClick={() => addSuggestion(t)}
                   disabled={!canAddTag}
-                  className="px-2 py-0.5 text-xs font-serif border"
+                  className="px-2 py-1 text-xs font-serif border"
                   style={{
                     borderColor: '#E8E0D2',
                     color: canAddTag ? '#6d5f54' : '#c0b8b0',
                     backgroundColor: '#fff',
                   }}
                 >
-                  {t}
+                  + {t}
                 </button>
               ))}
             </div>
