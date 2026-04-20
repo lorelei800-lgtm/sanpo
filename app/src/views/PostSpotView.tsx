@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Spot, SpotCategory, Vibe } from '../types'
 import { CategoryPicker } from '../components/CategoryPicker'
 import { VIBES, VIBE_ORDER } from '../utils/categories'
-import { createSpot } from '../services/cmsApi'
+import { createSpot, uploadAsset } from '../services/cmsApi'
 import { CMS } from '../config'
 import { getDiscoverer, setDiscoverer } from '../utils/discoverer'
 
@@ -14,7 +14,10 @@ interface PostSpotViewProps {
 export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
   const [title, setTitle]             = useState('')
   const [description, setDescription] = useState('')
-  const [photoUrl, setPhotoUrl]       = useState('')
+  const [photoFile, setPhotoFile]     = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string>('')
+  const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'done' | 'error'>('idle')
+  const [uploadedUrl, setUploadedUrl] = useState<string>('')
   const [category, setCategory]       = useState<SpotCategory>('other')
   const [vibe, setVibe]               = useState<Vibe | ''>('')
   const [lat, setLat]                 = useState<number | null>(null)
@@ -22,14 +25,17 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
   const [addressHint, setAddressHint] = useState('')
   const [name, setName]               = useState(getDiscoverer() || '')
   const [locating, setLocating]       = useState(false)
+  const [locError, setLocError]       = useState(false)
   const [submitting, setSubmitting]   = useState(false)
   const [error, setError]             = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { void requestLocation() }, [])
 
   async function requestLocation() {
-    if (!navigator.geolocation) return
+    if (!navigator.geolocation) { setLocError(true); return }
     setLocating(true)
+    setLocError(false)
     navigator.geolocation.getCurrentPosition(
       pos => {
         setLat(pos.coords.latitude)
@@ -37,31 +43,72 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
         setLocating(false)
       },
       () => {
-        // Fallback to Tokyo center if denied
-        setLat(35.700)
-        setLng(139.755)
         setLocating(false)
+        setLocError(true)
       },
-      { enableHighAccuracy: true, timeout: 10000 },
+      { enableHighAccuracy: true, timeout: 12000 },
     )
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoFile(file)
+    setUploadedUrl('')
+    setUploadProgress('idle')
+    // Show local preview immediately
+    const reader = new FileReader()
+    reader.onload = ev => setPhotoPreview(ev.target?.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  async function handleUpload() {
+    if (!photoFile) return
+    setUploadProgress('uploading')
+    const url = await uploadAsset(photoFile)
+    if (url) {
+      setUploadedUrl(url)
+      setUploadProgress('done')
+    } else {
+      setUploadProgress('error')
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (!title.trim()) { setError('A little caption is required.'); return }
-    if (!photoUrl.trim()) { setError('A photo URL is required.'); return }
-    if (lat == null || lng == null) { setError('We still need a location.'); return }
+    if (!photoPreview) { setError('Please choose a photo.'); return }
+    if (lat == null || lng == null) { setError('Location is still needed — tap "retry" above.'); return }
     if (!name.trim()) { setError('Tell us who you are.'); return }
 
     setSubmitting(true)
     setDiscoverer(name.trim())
 
+    // If CMS writable and photo not yet uploaded, upload now
+    let finalPhotoUrl = uploadedUrl
+    if (CMS.writable && photoFile && !uploadedUrl) {
+      setUploadProgress('uploading')
+      const url = await uploadAsset(photoFile)
+      if (url) {
+        finalPhotoUrl = url
+        setUploadedUrl(url)
+        setUploadProgress('done')
+      } else {
+        setUploadProgress('error')
+        // Fall back to data URL so the post still works locally
+        finalPhotoUrl = photoPreview
+      }
+    }
+
+    // If not writable, use the local data URL (browser-only)
+    if (!finalPhotoUrl) finalPhotoUrl = photoPreview
+
     const partial: Omit<Spot, 'id'> = {
       title: title.trim(),
       description: description.trim(),
       lat, lng,
-      photoUrl: photoUrl.trim(),
+      photoUrl: finalPhotoUrl,
       category,
       discoveredAt: new Date().toISOString(),
       discovererName: name.trim(),
@@ -74,23 +121,25 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
       id = await createSpot(partial)
     }
 
-    const spot: Spot = {
-      id: id ?? `local-${Date.now()}`,
-      ...partial,
-    }
+    const spot: Spot = { id: id ?? `local-${Date.now()}`, ...partial }
     setSubmitting(false)
     onPosted(spot)
   }
 
+  const photoReady = !!photoPreview
+
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch md:items-center md:justify-center p-0 md:p-6"
-         style={{ backgroundColor: 'rgba(43, 38, 35, 0.45)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-stretch md:items-center md:justify-center p-0 md:p-6"
+      style={{ backgroundColor: 'rgba(43, 38, 35, 0.45)' }}
+    >
       <form
         onSubmit={handleSubmit}
-        className="bg-cream w-full md:max-w-lg md:shadow-2xl md:border overflow-y-auto"
+        className="w-full md:max-w-lg md:shadow-2xl md:border overflow-y-auto"
         style={{ backgroundColor: '#FDFBF7', borderColor: '#E8E0D2', maxHeight: '100dvh' }}
       >
         <div className="p-5 sm:p-7">
+          {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <div>
               <h2 className="font-serif text-xl" style={{ color: '#2B2623' }}>Add a sanpo</h2>
@@ -108,17 +157,68 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
           </div>
 
           <div className="space-y-4">
-            <Field label="Photo URL" labelJa="写真のURL">
-              <input
-                type="url"
-                value={photoUrl}
-                onChange={e => setPhotoUrl(e.target.value)}
-                placeholder="https://…"
-                className="w-full border px-3 py-2 bg-white font-serif text-sm"
-                style={{ borderColor: '#E8E0D2', color: '#2B2623' }}
-              />
-            </Field>
+            {/* Photo picker */}
+            <div>
+              <span className="block mb-1 font-serif text-sm" style={{ color: '#2B2623' }}>
+                Photo <span className="font-jp ml-2 text-xs" style={{ color: '#8a7a6d' }}>写真</span>
+              </span>
 
+              {/* Preview */}
+              {photoPreview && (
+                <div className="mb-2 relative" style={{ paddingTop: '56.25%' }}>
+                  <img
+                    src={photoPreview}
+                    alt="preview"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    style={{ border: '4px solid white', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                  />
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 font-serif text-sm border transition-colors"
+                style={{
+                  borderColor: '#E8E0D2',
+                  backgroundColor: photoReady ? '#f5f0eb' : '#ffffff',
+                  color: '#2B2623',
+                }}
+              >
+                {photoReady ? '📷 Change photo' : '📷 Choose photo'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              {/* Upload status */}
+              {photoFile && CMS.writable && uploadProgress === 'idle' && (
+                <button
+                  type="button"
+                  onClick={() => void handleUpload()}
+                  className="mt-1 text-xs font-serif underline"
+                  style={{ color: '#C4612F' }}
+                >
+                  Upload to CMS now
+                </button>
+              )}
+              {uploadProgress === 'uploading' && (
+                <p className="mt-1 text-xs font-serif italic" style={{ color: '#8a7a6d' }}>Uploading photo…</p>
+              )}
+              {uploadProgress === 'done' && (
+                <p className="mt-1 text-xs font-serif" style={{ color: '#009E73' }}>✓ Photo uploaded</p>
+              )}
+              {uploadProgress === 'error' && (
+                <p className="mt-1 text-xs font-serif" style={{ color: '#C4612F' }}>Upload failed — photo saved locally only</p>
+              )}
+            </div>
+
+            {/* Caption */}
             <Field label="Caption" labelJa="一言メモ">
               <input
                 type="text"
@@ -131,34 +231,33 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
               />
             </Field>
 
+            {/* Notes */}
             <Field label="Notes (optional)" labelJa="説明（任意）">
               <textarea
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                rows={3}
+                rows={2}
                 className="w-full border px-3 py-2 bg-white font-serif text-sm"
                 style={{ borderColor: '#E8E0D2', color: '#2B2623' }}
               />
             </Field>
 
+            {/* Category */}
             <Field label="Category" labelJa="種類">
               <CategoryPicker value={category} onChange={setCategory} />
             </Field>
 
+            {/* Vibe */}
             <Field label="Vibe (optional)" labelJa="雰囲気（任意）">
               <div className="flex flex-wrap gap-2">
                 <VibeChip active={vibe === ''} onClick={() => setVibe('')} label="—" />
                 {VIBE_ORDER.map(v => (
-                  <VibeChip
-                    key={v}
-                    active={vibe === v}
-                    onClick={() => setVibe(v)}
-                    label={VIBES[v].label}
-                  />
+                  <VibeChip key={v} active={vibe === v} onClick={() => setVibe(v)} label={VIBES[v].label} />
                 ))}
               </div>
             </Field>
 
+            {/* Address hint */}
             <Field label="Address hint (optional)" labelJa="場所の手がかり（任意）">
               <input
                 type="text"
@@ -170,6 +269,7 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
               />
             </Field>
 
+            {/* Your name */}
             <Field label="Your name" labelJa="あなたの名前">
               <input
                 type="text"
@@ -181,21 +281,47 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
               />
             </Field>
 
+            {/* Location */}
             <div className="font-serif italic text-xs pt-1" style={{ color: '#8a7a6d' }}>
-              {locating
-                ? 'Finding you on the map…'
-                : lat != null
-                  ? `Pinned at ${lat.toFixed(4)}, ${lng!.toFixed(4)}`
-                  : 'No location yet.'}
-              {!locating && (
-                <button
-                  type="button"
-                  onClick={() => void requestLocation()}
-                  className="ml-2 underline"
-                  style={{ color: '#C4612F' }}
-                >
-                  re-locate
-                </button>
+              {locating ? (
+                '📍 Finding your location…'
+              ) : locError ? (
+                <>
+                  <span style={{ color: '#C4612F' }}>Location unavailable.</span>
+                  {' '}
+                  <button
+                    type="button"
+                    onClick={() => void requestLocation()}
+                    className="underline"
+                    style={{ color: '#C4612F' }}
+                  >
+                    Retry
+                  </button>
+                  {' or '}
+                  <button
+                    type="button"
+                    onClick={() => { setLat(35.700); setLng(139.755); setLocError(false) }}
+                    className="underline"
+                    style={{ color: '#8a7a6d' }}
+                  >
+                    use Tokyo center
+                  </button>
+                </>
+              ) : lat != null ? (
+                <>
+                  📍 {lat.toFixed(4)}, {lng!.toFixed(4)}
+                  {' · '}
+                  <button
+                    type="button"
+                    onClick={() => void requestLocation()}
+                    className="underline"
+                    style={{ color: '#C4612F' }}
+                  >
+                    refresh
+                  </button>
+                </>
+              ) : (
+                'No location yet.'
               )}
             </div>
 
@@ -203,6 +329,7 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
               <p className="font-serif italic text-sm" style={{ color: '#C4612F' }}>{error}</p>
             )}
 
+            {/* Submit */}
             <div className="pt-3 flex items-center gap-3">
               <button
                 type="submit"
@@ -228,7 +355,7 @@ export function PostSpotView({ onClose, onPosted }: PostSpotViewProps) {
 
             {!CMS.writable && (
               <p className="font-serif italic text-xs text-center pt-1" style={{ color: '#8a7a6d' }}>
-                Offline mode: this sanpo lives only in your browser.
+                Offline mode — this sanpo lives only in your browser.
               </p>
             )}
           </div>

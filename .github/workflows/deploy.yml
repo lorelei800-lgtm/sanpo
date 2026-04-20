@@ -35,9 +35,10 @@ jobs:
         working-directory: app
         env:
           VITE_CMS_BASE_URL:   ${{ secrets.VITE_CMS_BASE_URL }}
+          VITE_CMS_WORKSPACE:  ${{ secrets.VITE_CMS_WORKSPACE }}
           VITE_CMS_PROJECT:    ${{ secrets.VITE_CMS_PROJECT }}
+          VITE_CMS_TOKEN:      ${{ secrets.VITE_CMS_TOKEN }}
           VITE_CMS_SPOT_MODEL: sanpo-spot
-          # VITE_CMS_TOKEN is intentionally not set for public builds (read-only)
 
       - uses: actions/upload-pages-artifact@v3
         with:
