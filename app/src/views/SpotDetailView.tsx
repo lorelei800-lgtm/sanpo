@@ -1,0 +1,117 @@
+import { useEffect, useState } from 'react'
+import type { Spot } from '../types'
+import { CATEGORIES, VIBES } from '../utils/categories'
+
+interface SpotDetailViewProps {
+  spot: Spot
+  visitorOrdinal: number  // 1-based
+  onClose: () => void
+}
+
+export function SpotDetailView({ spot, visitorOrdinal, onClose }: SpotDetailViewProps) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setOpen(true), 10)
+    return () => clearTimeout(t)
+  }, [])
+
+  const cat = CATEGORIES[spot.category]
+  const vibeInfo = spot.vibe ? VIBES[spot.vibe] : null
+  const date = new Date(spot.discoveredAt)
+  const month = date.toLocaleString('en-US', { month: 'long' })
+  const year = date.getFullYear()
+
+  const ordinalStr = formatOrdinal(visitorOrdinal)
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        className="fixed inset-0 z-40 transition-opacity"
+        style={{
+          backgroundColor: 'rgba(43, 38, 35, 0.35)',
+          opacity: open ? 1 : 0,
+        }}
+      />
+
+      {/* Mobile: bottom sheet. Desktop: right side panel */}
+      <div
+        className={`fixed z-50 bg-cream shadow-2xl transition-transform overflow-y-auto
+          inset-x-0 bottom-0 max-h-[88vh] rounded-t-lg
+          md:inset-y-0 md:right-0 md:left-auto md:w-[420px] md:max-h-full md:rounded-none md:border-l`}
+        style={{
+          transform: open
+            ? 'translateY(0) translateX(0)'
+            : (typeof window !== 'undefined' && window.innerWidth >= 768
+                ? 'translateX(100%)'
+                : 'translateY(100%)'),
+          borderColor: '#E8E0D2',
+          backgroundColor: '#FDFBF7',
+        }}
+      >
+        <div className="p-5 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <span className="font-serif italic text-xs" style={{ color: '#8a7a6d' }}>
+              {cat.emoji} {cat.label} <span className="font-jp">· {cat.labelJa}</span>
+            </span>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center text-xl"
+              style={{ color: '#8a7a6d' }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Polaroid photo */}
+          <div className="bg-white p-3 pb-6 shadow-lg mx-auto" style={{ maxWidth: 360 }}>
+            <div className="w-full bg-neutral-200" style={{ aspectRatio: '1 / 1' }}>
+              {spot.photoUrl ? (
+                <img src={spot.photoUrl} alt={spot.title} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-6xl">{cat.emoji}</div>
+              )}
+            </div>
+            <p
+              className="mt-3 font-serif italic text-center leading-snug px-2"
+              style={{ color: '#2B2623', fontSize: 14 }}
+            >
+              {spot.title}
+            </p>
+          </div>
+
+          {spot.description && (
+            <p className="mt-5 font-serif text-sm leading-relaxed" style={{ color: '#2B2623' }}>
+              {spot.description}
+            </p>
+          )}
+
+          <div className="mt-5 pt-4 border-t space-y-2 font-serif text-xs" style={{ borderColor: '#E8E0D2', color: '#6d5f54' }}>
+            <p>
+              First seen by <span style={{ color: '#C4612F' }}>{spot.discovererName || 'Anonymous'}</span>
+              {' · '}{month} {year}
+            </p>
+            {spot.addressHint && <p className="italic">{spot.addressHint}</p>}
+            {vibeInfo && (
+              <p>
+                Vibe: <span style={{ color: '#C4612F' }}>{vibeInfo.label}</span>
+                <span className="font-jp ml-1">· {vibeInfo.labelJa}</span>
+              </p>
+            )}
+            <p className="italic pt-2" style={{ color: '#8a7a6d' }}>
+              You are the {ordinalStr} to see this.
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function formatOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
+}

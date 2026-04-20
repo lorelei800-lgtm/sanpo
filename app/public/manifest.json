@@ -1,0 +1,17 @@
+{
+  "name": "SANPO 散歩",
+  "short_name": "SANPO",
+  "description": "Your map of beautiful accidents",
+  "lang": "ja",
+  "start_url": "/sanpo/",
+  "display": "standalone",
+  "background_color": "#FDFBF7",
+  "theme_color": "#C4612F",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
