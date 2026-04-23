@@ -80,26 +80,52 @@ function itemsUrl(model: string): string {
 async function fetchAuthenticated(): Promise<CmsItem[]> {
   const url = `${itemsUrl(CMS.spotModel)}?perPage=200&sort=createdAt&dir=desc`
   const res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(10000) })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  if (!res.ok) {
+    // Capture response body for diagnostics — visible in browser DevTools console
+    const body = await res.text().catch(() => '')
+    throw new Error(`[CMS] authenticated ${res.status} ${res.statusText}: ${body}`)
+  }
   const data: CmsListResponse = await res.json()
-  return data.results ?? data.items ?? []
+  const items = data.results ?? data.items ?? []
+  console.info(`[CMS] authenticated fetch → ${items.length} item(s)`)
+  return items
 }
 
 async function fetchPublic(): Promise<CmsItem[]> {
   const url = `${CMS.baseUrl}/api/p/${CMS.project}/${CMS.spotModel}?perPage=200&sort=createdAt&dir=desc`
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`[CMS] public ${res.status} ${res.statusText}: ${body}`)
+  }
   const data: CmsListResponse = await res.json()
-  return data.results ?? data.items ?? []
+  const items = data.results ?? data.items ?? []
+  console.info(`[CMS] public fetch → ${items.length} item(s)`)
+  return items
 }
 
 export async function fetchSpots(): Promise<Spot[]> {
-  if (!CMS.enabled) return []
+  if (!CMS.enabled) {
+    console.warn('[CMS] disabled — VITE_CMS_BASE_URL or VITE_CMS_PROJECT not set')
+    return []
+  }
+
+  // Try authenticated API first; fall back to public API on any failure.
+  // This handles: expired/changed tokens, CORS restrictions on private endpoint.
+  if (CMS.writable) {
+    try {
+      const items = await fetchAuthenticated()
+      return items.map(itemToSpot)
+    } catch (err) {
+      console.warn('[CMS] authenticated fetch failed — falling back to public API:', err)
+    }
+  }
+
   try {
-    const items = CMS.writable ? await fetchAuthenticated() : await fetchPublic()
+    const items = await fetchPublic()
     return items.map(itemToSpot)
   } catch (err) {
-    console.warn('[CMS] fetchSpots failed', err)
+    console.warn('[CMS] public fetch also failed:', err)
     return []
   }
 }
