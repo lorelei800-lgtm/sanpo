@@ -110,22 +110,15 @@ export async function fetchSpots(): Promise<Spot[]> {
     return []
   }
 
-  // Try authenticated API first; fall back to public API on any failure.
-  // This handles: expired/changed tokens, CORS restrictions on private endpoint.
-  if (CMS.writable) {
-    try {
-      const items = await fetchAuthenticated()
-      return items.map(itemToSpot)
-    } catch (err) {
-      console.warn('[CMS] authenticated fetch failed — falling back to public API:', err)
-    }
-  }
-
+  // Always use the public (unauthenticated) endpoint for reads.
+  // The authenticated endpoint requires an Authorization header, which triggers a
+  // CORS preflight that Re:Earth CMS blocks from browser origins (GitHub Pages, etc.).
+  // The public endpoint has no CORS restriction and returns all PUBLIC-status items.
   try {
     const items = await fetchPublic()
     return items.map(itemToSpot)
   } catch (err) {
-    console.warn('[CMS] public fetch also failed:', err)
+    console.warn('[CMS] fetchSpots failed:', err)
     return []
   }
 }
