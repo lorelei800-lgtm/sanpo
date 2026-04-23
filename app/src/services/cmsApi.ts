@@ -77,20 +77,6 @@ function itemsUrl(model: string): string {
   return `${CMS.baseUrl}/api/${CMS.workspace}/projects/${CMS.project}/models/${model}/items`
 }
 
-async function fetchAuthenticated(): Promise<CmsItem[]> {
-  const url = `${itemsUrl(CMS.spotModel)}?perPage=200&sort=createdAt&dir=desc`
-  const res = await fetch(url, { headers: authHeaders(), signal: AbortSignal.timeout(10000) })
-  if (!res.ok) {
-    // Capture response body for diagnostics — visible in browser DevTools console
-    const body = await res.text().catch(() => '')
-    throw new Error(`[CMS] authenticated ${res.status} ${res.statusText}: ${body}`)
-  }
-  const data: CmsListResponse = await res.json()
-  const items = data.results ?? data.items ?? []
-  console.info(`[CMS] authenticated fetch → ${items.length} item(s)`)
-  return items
-}
-
 async function fetchPublic(): Promise<CmsItem[]> {
   const url = `${CMS.baseUrl}/api/p/${CMS.project}/${CMS.spotModel}?perPage=200&sort=createdAt&dir=desc`
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
