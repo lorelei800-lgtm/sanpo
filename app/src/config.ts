@@ -7,13 +7,15 @@
  *                            Falls back to VITE_CMS_PROJECT if not set.
  */
 export const CMS = {
-  baseUrl:      import.meta.env.VITE_CMS_BASE_URL          as string | undefined,
-  workspace:    import.meta.env.VITE_CMS_WORKSPACE         as string | undefined,
-  project:      import.meta.env.VITE_CMS_PROJECT           as string | undefined,
-  projectAlias: (import.meta.env.VITE_CMS_PROJECT_ALIAS    as string | undefined)
-                ?? (import.meta.env.VITE_CMS_PROJECT       as string | undefined),
-  spotModel:    (import.meta.env.VITE_CMS_SPOT_MODEL       as string | undefined) ?? 'sanpo-spot',
-  token:        import.meta.env.VITE_CMS_TOKEN             as string | undefined,
+  baseUrl:        import.meta.env.VITE_CMS_BASE_URL            as string | undefined,
+  workspace:      import.meta.env.VITE_CMS_WORKSPACE           as string | undefined,
+  project:        import.meta.env.VITE_CMS_PROJECT             as string | undefined,
+  // Public API uses workspace alias + project alias, e.g. /api/p/Yoshi77/sanpo/sanpo-spot
+  workspaceAlias: (import.meta.env.VITE_CMS_WORKSPACE_ALIAS    as string | undefined),
+  projectAlias:   (import.meta.env.VITE_CMS_PROJECT_ALIAS      as string | undefined)
+                  ?? (import.meta.env.VITE_CMS_PROJECT         as string | undefined),
+  spotModel:      (import.meta.env.VITE_CMS_SPOT_MODEL         as string | undefined) ?? 'sanpo-spot',
+  token:          import.meta.env.VITE_CMS_TOKEN               as string | undefined,
 
   get enabled():  boolean { return !!(this.baseUrl && this.project) },
   get writable(): boolean { return this.enabled && !!this.token },

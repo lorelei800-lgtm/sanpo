@@ -78,8 +78,12 @@ function itemsUrl(model: string): string {
 }
 
 async function fetchPublic(): Promise<CmsItem[]> {
-  // Public API uses the project alias (e.g. "sanpo"), not the KSUID project ID.
-  const url = `${CMS.baseUrl}/api/p/${CMS.projectAlias}/${CMS.spotModel}?perPage=200&sort=createdAt&dir=desc`
+  // Public API format: /api/p/{workspaceAlias}/{projectAlias}/{modelKey}
+  // e.g. https://api.cms.reearth.io/api/p/Yoshi77/sanpo/sanpo-spot
+  const base = CMS.workspaceAlias
+    ? `${CMS.baseUrl}/api/p/${CMS.workspaceAlias}/${CMS.projectAlias}`
+    : `${CMS.baseUrl}/api/p/${CMS.projectAlias}`
+  const url = `${base}/${CMS.spotModel}?perPage=200&sort=createdAt&dir=desc`
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
