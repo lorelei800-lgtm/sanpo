@@ -78,7 +78,8 @@ function itemsUrl(model: string): string {
 }
 
 async function fetchPublic(): Promise<CmsItem[]> {
-  const url = `${CMS.baseUrl}/api/p/${CMS.project}/${CMS.spotModel}?perPage=200&sort=createdAt&dir=desc`
+  // Public API uses the project alias (e.g. "sanpo"), not the KSUID project ID.
+  const url = `${CMS.baseUrl}/api/p/${CMS.projectAlias}/${CMS.spotModel}?perPage=200&sort=createdAt&dir=desc`
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
